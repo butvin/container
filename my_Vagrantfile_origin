@@ -1,0 +1,64 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.require_version ">= 2.2.0"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vagrant.plugins = ["vagrant-disksize", "vagrant-vbguest"]
+  config.disksize.size = "40GB"
+  # config.ssh.insert_key = false
+  # config.ssh.private_key_path = ["config/devbox/keys/vagrant_rsa"]
+  config.vm.define "devbox", primary: true do | devbox |
+      devbox.vm.box = "generic/debian10"
+      # devbox.vm.box_url = "https://www.bastrucks.com/box/basdevdebian10.box"
+      devbox.vm.host_name = "basdevbox"
+      devbox.vm.box_check_update = true
+      devbox.vm.network "private_network", ip: "192.168.200.200"
+      devbox.vm.synced_folder "./", "/vagrant", type: "virtualbox", owner: "vagrant", group: "vagrant"
+      devbox.vm.synced_folder "./", "/srv/erp", owner: "www-data", group: "www-data"
+      devbox.vm.synced_folder "../deploy", "/srv/deploy", owner: "www-data", group: "www-data"
+      devbox.vm.synced_folder "../web", "/srv/legacy/websiteng", owner: "www-data", group: "www-data"
+      devbox.vm.synced_folder "../account", "/srv/legacy/account", owner: "www-data", group: "www-data"
+      devbox.vm.synced_folder "../wapi", "/srv/wapi", owner: "www-data", group: "www-data"
+      devbox.vm.synced_folder "../jobs", "/srv/jobs", owner: "www-data", group: "www-data"
+
+      devbox.vm.provider "virtualbox" do |vb|
+        vb.customize ["modifyvm", :id, "--memory", "4096"]
+        vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+        vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+        vb.customize ["setextradata", :id, "VBoxInternal2/SharedFoldersEnableSymlinksCreate/vagrant", "1"]
+      end
+
+      # Unless you know what you're doing, I suggest you stay away
+      # from this code. This is NIX Mastery!!!
+      devbox.vm.provision "shell", inline: <<-SHELL
+        # Fixing mirrors to use the closest mirror
+        #
+        # For NL
+        sed -i 's/mirror\.nl\.leaseweb\.net/ftp.nl.debian.org/g' /etc/apt/sources.list
+      SHELL
+
+
+      # Installing puppet for provisioning
+      devbox.vm.provision "shell", inline: <<-SHELL
+        if [ ! -x /usr/bin/puppet ]
+        then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -yqq puppet
+        fi
+      SHELL
+
+      devbox.vm.provision "puppet" do |puppet|
+        puppet.manifests_path = "config/devbox/puppet/manifests"
+        puppet.manifest_file  = "site.pp"
+        puppet.module_path = "config/devbox/puppet/modules"
+      end
+  end
+
+     # config.vm.provision "shell", inline: "sudo service apache2 restart", run: "always"
+
+end
