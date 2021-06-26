@@ -1,0 +1,9 @@
+[submodule "erp"]
+	path = erp
+	url = ./erp/
+[submodule "deploy"]
+	path = deploy
+	url = ./deploy/
+[submodule "web"]
+	path = web
+	url = ./web/
